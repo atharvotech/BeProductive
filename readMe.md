@@ -12,7 +12,7 @@
 
 **The only Windows productivity tool that locks down your entire system, rewards your focus with real points, and fights back when you try to cheat.**
 
-[📥 Download](#-installation--setup) · [🖥️ Dashboard Preview](#-dashboard-preview) · [⭐ Star this Repo](https://github.com/atharvotech/Focus-Engine-Pro) · [🐛 Report a Bug](https://github.com/atharvotech/Focus-Engine-Pro/issues)
+[📥 Download](#-installation--setup) · [🖥️ Dashboard Preview](#-dashboard-preview) · [⭐ Star this Repo](https://github.com/atharvotech/Productive-OS) · [🐛 Report a Bug](https://github.com/atharvotech/Productive-OS/issues)
 
 </div>
 
