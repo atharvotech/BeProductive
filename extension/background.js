@@ -4,6 +4,10 @@
  * Tracks time spent per domain, syncs to Python WebSocket server every 30s,
  * blocks distraction URLs (always-on + focus mode enhanced),
  * and manages focus mode state from the server.
+ * 
+ * IMPORTANT: Only tracks time when:
+ * 1. The Chrome window is FOCUSED (foreground)
+ * 2. For "study" sites, the window must be MAXIMIZED (anti-split-screen cheat)
  */
 
 // ─── Configuration ───────────────────────────────────────────────────────
@@ -57,6 +61,8 @@ const STUDY_SAFE_DOMAINS = [
 
 // Whitelisted YouTube channel patterns (user can add more via settings)
 let whitelistedChannels = [];
+// Whitelisted websites (user-defined study domains)
+let whitelistedWebsites = [];
 
 // ─── State ───────────────────────────────────────────────────────────────
 
@@ -71,6 +77,8 @@ let wsConnection = null;
 let wsConnected = false;
 let reconnectTimer = null;
 let reconnectDelay = 1000;
+let browserHasFocus = true;   // Whether ANY Chrome window is focused
+let activeWindowState = "maximized"; // Current window state
 
 // ─── WebSocket Connection ────────────────────────────────────────────────
 
@@ -86,7 +94,7 @@ function connectWebSocket() {
       reconnectDelay = 1000;
       // Immediately check focus mode
       sendWS({ action: "get_focus_mode" });
-      // Load whitelisted channels
+      // Load whitelisted channels & websites
       sendWS({ action: "get_settings" });
     };
 
@@ -138,8 +146,12 @@ function handleServerMessage(data) {
     focusMode = data.mode === "on";
     chrome.storage.local.set({ focusMode });
   } else if (data.action === "settings") {
+    // Load whitelisted channels
     const channels = data.data?.whitelisted_channels || "";
     whitelistedChannels = channels.split(",").map(c => c.trim().toLowerCase()).filter(Boolean);
+    // Load whitelisted websites
+    const websites = data.data?.whitelisted_websites || "";
+    whitelistedWebsites = websites.split(",").map(w => w.trim().toLowerCase()).filter(Boolean);
   }
 }
 
@@ -159,7 +171,11 @@ function tickTime() {
   const elapsed = Math.round((now - lastTickTime) / 1000);
   lastTickTime = now;
 
-  if (activeTabDomain && elapsed > 0 && elapsed < 300) {
+  // ONLY count time if:
+  // 1. Chrome has focus (browser is foreground app)
+  // 2. There is an active tab with a domain
+  // 3. Elapsed time is reasonable (< 5 min, handles sleep/lock)
+  if (browserHasFocus && activeTabDomain && elapsed > 0 && elapsed < 300) {
     if (!timeData[activeTabDomain]) {
       timeData[activeTabDomain] = { seconds: 0, url: "", title: "" };
     }
@@ -177,6 +193,14 @@ function updateActiveTab() {
       activeTabUrl = tab.url || "";
       activeTabTitle = tab.title || "";
       activeTabDomain = getDomain(activeTabUrl);
+
+      // Also check window state for the tab's window
+      if (tab.windowId) {
+        chrome.windows.get(tab.windowId, (win) => {
+          if (chrome.runtime.lastError) return;
+          activeWindowState = win.state; // "normal", "maximized", "minimized", "fullscreen"
+        });
+      }
     }
   });
 }
@@ -188,7 +212,8 @@ function syncTimeData() {
 
   for (const [domain, data] of Object.entries(timeData)) {
     if (data.seconds > 0) {
-      const category = classifyDomain(domain, data.title);
+      const isMaximized = activeWindowState === "maximized" || activeWindowState === "fullscreen";
+      const category = classifyDomain(domain, data.title, isMaximized);
       sendWS({
         action: "log_web_time",
         domain: domain,
@@ -202,12 +227,21 @@ function syncTimeData() {
   timeData = {};
 }
 
-function classifyDomain(domain, title = "") {
+function classifyDomain(domain, title = "", isMaximized = true) {
   const d = domain.toLowerCase();
   const t = title.toLowerCase();
 
+  // Check user-whitelisted websites first
+  for (const wl of whitelistedWebsites) {
+    if (d.includes(wl)) {
+      return isMaximized ? "study" : "productivity";
+    }
+  }
+
   // Study sites
-  if (STUDY_SAFE_DOMAINS.some(sd => d.includes(sd))) return "study";
+  if (STUDY_SAFE_DOMAINS.some(sd => d.includes(sd))) {
+    return isMaximized ? "study" : "productivity";
+  }
 
   // Social media
   if (FOCUS_BLOCKED_DOMAINS.some(bd => d.includes(bd) && 
@@ -217,9 +251,21 @@ function classifyDomain(domain, title = "") {
   // Entertainment
   if (FOCUS_BLOCKED_DOMAINS.some(bd => d.includes(bd))) return "entertainment";
 
-  // YouTube — classify by title
+  // YouTube — classify by title + whitelisted channels
   if (d.includes("youtube.com")) {
-    if (STUDY_SAFE_KEYWORDS_IN_TITLE(t)) return "study";
+    // Check whitelisted channels
+    if (whitelistedChannels.length > 0) {
+      const isWhitelistedChannel = whitelistedChannels.some(ch => 
+        t.includes(ch)
+      );
+      if (isWhitelistedChannel) {
+        return isMaximized ? "study" : "productivity";
+      }
+    }
+    // Check study keywords in title
+    if (STUDY_SAFE_KEYWORDS_IN_TITLE(t)) {
+      return isMaximized ? "study" : "productivity";
+    }
     if (FOCUS_BLOCKED_KEYWORDS.some(kw => t.includes(kw))) return "entertainment";
     return "entertainment"; // Default YouTube = entertainment
   }
@@ -265,6 +311,13 @@ function shouldBlockUrl(url, title = "") {
     // Check if study-safe
     if (STUDY_SAFE_DOMAINS.some(sd => domain.includes(sd))) {
       return { block: false, reason: "" };
+    }
+
+    // Check user-whitelisted websites
+    for (const wl of whitelistedWebsites) {
+      if (domain.includes(wl)) {
+        return { block: false, reason: "" };
+      }
     }
 
     // YouTube special handling
@@ -407,8 +460,18 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 chrome.windows.onFocusChanged.addListener((windowId) => {
   tickTime();
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    // Chrome has LOST FOCUS — user switched to another app
+    // STOP counting time for web tabs
+    browserHasFocus = false;
     activeTabDomain = "";
   } else {
+    // Chrome regained focus
+    browserHasFocus = true;
+    // Check window state (maximized/normal/etc)
+    chrome.windows.get(windowId, (win) => {
+      if (chrome.runtime.lastError) return;
+      activeWindowState = win.state;
+    });
     updateActiveTab();
   }
 });
@@ -453,7 +516,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     sendWS({ action: "get_focus_mode" });
   } else if (alarm.name === "tickTime") {
     tickTime();
-    updateActiveTab();
+    if (browserHasFocus) updateActiveTab();
   }
 });
 

@@ -26,6 +26,8 @@ GetForegroundWindow = user32.GetForegroundWindow
 GetWindowTextW = user32.GetWindowTextW
 GetWindowTextLengthW = user32.GetWindowTextLengthW
 GetWindowThreadProcessId = user32.GetWindowThreadProcessId
+IsZoomed = user32.IsZoomed  # Returns non-zero if window is maximized
+IsIconic = user32.IsIconic   # Returns non-zero if window is minimized
 
 
 def get_foreground_info() -> dict:
@@ -52,7 +54,10 @@ def get_foreground_info() -> dict:
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         pass
 
-    return {"app": app_name, "title": title, "pid": pid.value}
+    # Check if window is maximized (anti-cheat: study only counts when maximized)
+    is_maximized = bool(IsZoomed(hwnd))
+
+    return {"app": app_name, "title": title, "pid": pid.value, "is_maximized": is_maximized}
 
 
 # ─── Activity Classification ──────────────────────────────────────────────
@@ -97,10 +102,28 @@ GAMING_KEYWORDS = [
 
 SPOTIFY_EXE = "spotify.exe"
 
+# Whitelisted websites loaded from DB (used for browser title classification)
+_whitelisted_websites = []
+_whitelisted_yt_channels = []
 
-def classify_activity(app_name: str, window_title: str) -> str:
+def load_whitelists_from_db():
+    """Load whitelisted websites and YouTube channels from settings."""
+    global _whitelisted_websites, _whitelisted_yt_channels
+    try:
+        wl = db.get_setting("whitelisted_websites", "")
+        if wl:
+            _whitelisted_websites = [w.strip().lower() for w in wl.split(",") if w.strip()]
+        ch = db.get_setting("whitelisted_channels", "")
+        if ch:
+            _whitelisted_yt_channels = [c.strip().lower() for c in ch.split(",") if c.strip()]
+    except Exception:
+        pass
+
+
+def classify_activity(app_name: str, window_title: str, is_maximized: bool = True) -> str:
     """
     Classify window activity into categories.
+    Study only counts when window is maximized (anti-split-screen cheat).
     Returns: 'study' | 'gaming' | 'social' | 'entertainment' | 'idle' | 'productivity' | 'other'
     """
     app_lower = app_name.lower()
@@ -118,16 +141,28 @@ def classify_activity(app_name: str, window_title: str) -> str:
     if app_lower == "unknown" or not window_title.strip():
         return "idle"
 
-    # Study apps (IDEs, editors)
+    # Study apps (IDEs, editors) — still require maximized
     if app_lower in STUDY_APPS:
-        return "study"
+        return "study" if is_maximized else "productivity"
 
     # Browser — classify by page title
     if app_lower in ("chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"):
-        # Check study keywords first
+        # Check whitelisted websites first
+        for domain in _whitelisted_websites:
+            if domain in title_lower:
+                return "study" if is_maximized else "productivity"
+
+        # Check YouTube with whitelisted channels
+        if "youtube" in title_lower:
+            # Check if a whitelisted channel name appears in the title
+            for ch in _whitelisted_yt_channels:
+                if ch in title_lower:
+                    return "study" if is_maximized else "productivity"
+
+        # Check study keywords
         for kw in STUDY_TITLE_KEYWORDS:
             if kw in title_lower:
-                return "study"
+                return "study" if is_maximized else "productivity"
         # Check social media
         for kw in SOCIAL_MEDIA_KEYWORDS:
             if kw in title_lower:
@@ -184,15 +219,19 @@ class ActivityTracker:
         self._running = False
         self._thread = None
         self._accumulated = {}  # (app, category) -> {seconds, last_title}
-        self._spotify_log = []  # Track Spotify history
+        self._spotify_log = []  # Track Spotify history (deduplicated)
+        self._last_spotify_track = ""  # Last logged track for dedup
+        self._spotify_listen_seconds = 0  # Accumulated listening seconds
         self._last_flush = time.time()
         self._study_accumulator = 0  # Seconds of study since last token earn
         self._gaming_accumulator = 0  # Seconds of gaming since last token deduct
         self._token_earn_rate = int(db.get_setting("token_earn_rate", "30"))
         self._token_deduct_rate = int(db.get_setting("token_deduct_rate", "15"))
+        self.on_flush = None  # Callback after data flush (for server push)
 
     def start(self):
         """Start the tracker in a daemon thread."""
+        load_whitelists_from_db()  # Load whitelisted websites/channels
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -213,7 +252,8 @@ class ActivityTracker:
                 info = get_foreground_info()
                 app = info["app"]
                 title = info["title"]
-                category = classify_activity(app, title)
+                is_maximized = info.get("is_maximized", True)
+                category = classify_activity(app, title, is_maximized)
 
                 # Accumulate
                 key = (app, category)
@@ -222,15 +262,29 @@ class ActivityTracker:
                 self._accumulated[key]["seconds"] += POLL_INTERVAL
                 self._accumulated[key]["last_title"] = title
 
-                # Track Spotify
+                # Track Spotify (deduplicated)
                 if app.lower() == SPOTIFY_EXE:
                     sp_info = parse_spotify_title(title)
                     if sp_info["playing"]:
-                        self._spotify_log.append({
-                            "time": datetime.datetime.now().isoformat(),
-                            "track": sp_info["track"],
-                            "artist": sp_info["artist"],
-                        })
+                        track_key = f"{sp_info['track']} - {sp_info['artist']}"
+                        if track_key != self._last_spotify_track:
+                            # New track — finalize previous track's duration
+                            if self._spotify_log and self._spotify_listen_seconds > 0:
+                                self._spotify_log[-1]["duration"] = self._spotify_listen_seconds
+                            # Add new entry
+                            self._spotify_log.append({
+                                "time": datetime.datetime.now().isoformat(),
+                                "track": sp_info["track"],
+                                "artist": sp_info["artist"],
+                                "duration": 0,
+                            })
+                            self._last_spotify_track = track_key
+                            self._spotify_listen_seconds = POLL_INTERVAL
+                        else:
+                            # Same track — accumulate listening time
+                            self._spotify_listen_seconds += POLL_INTERVAL
+                            if self._spotify_log:
+                                self._spotify_log[-1]["duration"] = self._spotify_listen_seconds
 
                 # Token accumulators
                 if category == "study":
@@ -256,17 +310,27 @@ class ActivityTracker:
 
     def _flush_to_db(self):
         """Write accumulated data to SQLite."""
-        for (app, category), data in self._accumulated.items():
-            if data["seconds"] > 0:
-                db.log_screen_time(app, data["last_title"], category, data["seconds"])
-        self._accumulated.clear()
-
-        # Update daily summary
-        today = datetime.date.today().isoformat()
         try:
-            db.update_daily_summary(today)
-        except Exception:
-            pass
+            for (app, category), data in self._accumulated.items():
+                if data["seconds"] > 0:
+                    db.log_screen_time(app, data["last_title"], category, data["seconds"])
+            self._accumulated.clear()
+
+            # Update daily summary
+            today = datetime.date.today().isoformat()
+            try:
+                db.update_daily_summary(today)
+            except Exception:
+                pass
+
+            # Notify the API server to push updated data to clients
+            if self.on_flush:
+                try:
+                    self.on_flush()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"  [!] Tracker flush error (will retry next cycle): {e}")
 
     def _process_tokens(self):
         """Earn tokens for study, deduct for gaming."""

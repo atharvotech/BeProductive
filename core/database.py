@@ -26,7 +26,22 @@ def _get_conn() -> sqlite3.Connection:
         _local.conn.row_factory = sqlite3.Row
         _local.conn.execute("PRAGMA journal_mode=WAL")
         _local.conn.execute("PRAGMA foreign_keys=ON")
+        _local.conn.execute("PRAGMA busy_timeout=5000")
     return _local.conn
+
+
+def _retry_write(fn, max_retries=3):
+    """Retry a database write operation if the DB is locked/busy."""
+    import time as _time
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e) or "busy" in str(e) or "disk I/O" in str(e):
+                if attempt < max_retries - 1:
+                    _time.sleep(0.5 * (attempt + 1))
+                    continue
+            raise
 
 
 def init_db():
@@ -118,13 +133,15 @@ def init_db():
 
 def log_screen_time(app_name: str, window_title: str, category: str, seconds: int):
     now = datetime.datetime.now()
-    conn = _get_conn()
-    conn.execute(
-        """INSERT INTO screen_time(date, hour, app_name, window_title, category, seconds)
-           VALUES(?, ?, ?, ?, ?, ?)""",
-        (now.strftime("%Y-%m-%d"), now.hour, app_name, window_title, category, seconds),
-    )
-    conn.commit()
+    def _write():
+        conn = _get_conn()
+        conn.execute(
+            """INSERT INTO screen_time(date, hour, app_name, window_title, category, seconds)
+               VALUES(?, ?, ?, ?, ?, ?)""",
+            (now.strftime("%Y-%m-%d"), now.hour, app_name, window_title, category, seconds),
+        )
+        conn.commit()
+    _retry_write(_write)
 
 
 def get_screen_time_stats(date: str) -> list:
@@ -176,8 +193,11 @@ def get_top_apps(date: str, limit: int = 10) -> list:
 
 
 def get_category_totals(date: str) -> dict:
-    """Return total seconds per category for a day."""
+    """Return total seconds per category for a day.
+    Merges screen_time (desktop) + web_time (extension) for a complete picture.
+    """
     conn = _get_conn()
+    # Desktop app screen time
     rows = conn.execute(
         """SELECT category, SUM(seconds) as total_sec
            FROM screen_time WHERE date = ?
@@ -192,6 +212,21 @@ def get_category_totals(date: str) -> dict:
             result[cat] += r["total_sec"]
         else:
             result["other"] += r["total_sec"]
+
+    # Also add web-based study time from the Chrome extension
+    web_rows = conn.execute(
+        """SELECT category, SUM(seconds) as total_sec
+           FROM web_time WHERE date = ? AND category != 'blocked'
+           GROUP BY category""",
+        (date,),
+    ).fetchall()
+    for r in web_rows:
+        cat = r["category"]
+        if cat in result:
+            result[cat] += r["total_sec"]
+        else:
+            result["other"] += r["total_sec"]
+
     return result
 
 
@@ -252,13 +287,15 @@ def get_yearly_stats(year: int) -> list:
 
 def log_web_time(domain: str, url: str, page_title: str, category: str, seconds: int):
     now = datetime.datetime.now()
-    conn = _get_conn()
-    conn.execute(
-        """INSERT INTO web_time(date, hour, domain, url, page_title, category, seconds)
-           VALUES(?, ?, ?, ?, ?, ?, ?)""",
-        (now.strftime("%Y-%m-%d"), now.hour, domain, url, page_title, category, seconds),
-    )
-    conn.commit()
+    def _write():
+        conn = _get_conn()
+        conn.execute(
+            """INSERT INTO web_time(date, hour, domain, url, page_title, category, seconds)
+               VALUES(?, ?, ?, ?, ?, ?, ?)""",
+            (now.strftime("%Y-%m-%d"), now.hour, domain, url, page_title, category, seconds),
+        )
+        conn.commit()
+    _retry_write(_write)
 
 
 def get_web_time_stats(date: str) -> list:
@@ -296,22 +333,26 @@ def get_token_balance() -> int:
 
 def earn_tokens(amount: int, reason: str = "study"):
     now = datetime.datetime.now()
-    conn = _get_conn()
-    conn.execute(
-        "INSERT INTO tokens(date, earned, spent, reason) VALUES(?, ?, 0, ?)",
-        (now.strftime("%Y-%m-%d"), amount, reason),
-    )
-    conn.commit()
+    def _write():
+        conn = _get_conn()
+        conn.execute(
+            "INSERT INTO tokens(date, earned, spent, reason) VALUES(?, ?, 0, ?)",
+            (now.strftime("%Y-%m-%d"), amount, reason),
+        )
+        conn.commit()
+    _retry_write(_write)
 
 
 def spend_tokens(amount: int, reason: str = "gaming"):
     now = datetime.datetime.now()
-    conn = _get_conn()
-    conn.execute(
-        "INSERT INTO tokens(date, earned, spent, reason) VALUES(?, 0, ?, ?)",
-        (now.strftime("%Y-%m-%d"), amount, reason),
-    )
-    conn.commit()
+    def _write():
+        conn = _get_conn()
+        conn.execute(
+            "INSERT INTO tokens(date, earned, spent, reason) VALUES(?, 0, ?, ?)",
+            (now.strftime("%Y-%m-%d"), amount, reason),
+        )
+        conn.commit()
+    _retry_write(_write)
 
 
 def get_token_history(date: str = None) -> list:
@@ -353,21 +394,23 @@ def get_all_settings() -> dict:
 
 def update_daily_summary(date: str):
     """Recompute and upsert the daily summary row."""
-    conn = _get_conn()
-    cats = get_category_totals(date)
-    total = sum(cats.values())
-    token_row = conn.execute(
-        "SELECT COALESCE(SUM(earned),0) as e, COALESCE(SUM(spent),0) as s FROM tokens WHERE date=?",
-        (date,),
-    ).fetchone()
-    conn.execute(
-        """INSERT OR REPLACE INTO daily_summary
-           (date, total_screen_sec, study_sec, entertainment_sec, gaming_sec, idle_sec, social_sec, tokens_earned, tokens_spent)
-           VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (date, total, cats["study"], cats["entertainment"], cats["gaming"],
-         cats["idle"], cats["social"], token_row["e"], token_row["s"]),
-    )
-    conn.commit()
+    def _write():
+        conn = _get_conn()
+        cats = get_category_totals(date)
+        total = sum(cats.values())
+        token_row = conn.execute(
+            "SELECT COALESCE(SUM(earned),0) as e, COALESCE(SUM(spent),0) as s FROM tokens WHERE date=?",
+            (date,),
+        ).fetchone()
+        conn.execute(
+            """INSERT OR REPLACE INTO daily_summary
+               (date, total_screen_sec, study_sec, entertainment_sec, gaming_sec, idle_sec, social_sec, tokens_earned, tokens_spent)
+               VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (date, total, cats["study"], cats["entertainment"], cats["gaming"],
+             cats["idle"], cats["social"], token_row["e"], token_row["s"]),
+        )
+        conn.commit()
+    _retry_write(_write)
 
 
 def get_streak() -> int:
@@ -393,9 +436,37 @@ def get_streak() -> int:
 # ─── Killed Processes Log ─────────────────────────────────────────────────
 
 def log_killed_process(process_name: str, reason: str = ""):
+    def _write():
+        conn = _get_conn()
+        conn.execute(
+            "INSERT INTO killed_processes(process_name, reason) VALUES(?, ?)",
+            (process_name, reason),
+        )
+        conn.commit()
+    _retry_write(_write)
+
+
+# ─── Recent Web Activity ─────────────────────────────────────────────────
+
+def get_recent_web_activity(limit: int = 20) -> list:
+    """Return the most recent web activity entries (newest first)."""
     conn = _get_conn()
-    conn.execute(
-        "INSERT INTO killed_processes(process_name, reason) VALUES(?, ?)",
-        (process_name, reason),
-    )
-    conn.commit()
+    rows = conn.execute(
+        """SELECT timestamp, domain, url, page_title, category, seconds
+           FROM web_time
+           WHERE category != 'blocked'
+           ORDER BY id DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_spotify_screen_time(date: str) -> int:
+    """Return total seconds of Spotify usage for a given date."""
+    conn = _get_conn()
+    row = conn.execute(
+        """SELECT COALESCE(SUM(seconds), 0) as total_sec
+           FROM screen_time WHERE date = ? AND LOWER(app_name) = 'spotify.exe'""",
+        (date,),
+    ).fetchone()
+    return row["total_sec"] if row else 0
