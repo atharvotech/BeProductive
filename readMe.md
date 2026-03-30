@@ -3,7 +3,7 @@
 <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"/>
 <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
 <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge"/>
-<img src="https://img.shields.io/github/stars/yourusername/Focus-Engine-Pro?style=for-the-badge&color=yellow"/>
+<img src="https://img.shields.io/github/stars/atharvotech/Focus-Engine-Pro?style=for-the-badge&color=yellow"/>
 
 <br/><br/>
 
@@ -12,7 +12,7 @@
 
 **The only Windows productivity tool that locks down your entire system, rewards your focus with real points, and fights back when you try to cheat.**
 
-[📥 Download](#-installation--setup) · [🖥️ Dashboard Preview](#-dashboard-preview) · [⭐ Star this Repo](https://github.com/yourusername/Focus-Engine-Pro) · [🐛 Report a Bug](https://github.com/yourusername/Focus-Engine-Pro/issues)
+[📥 Download](#-installation--setup) · [🖥️ Dashboard Preview](#-dashboard-preview) · [⭐ Star this Repo](https://github.com/atharvotech/Focus-Engine-Pro) · [🐛 Report a Bug](https://github.com/atharvotech/Focus-Engine-Pro/issues)
 
 </div>
 
