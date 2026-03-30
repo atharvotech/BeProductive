@@ -2,7 +2,6 @@
 
 <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"/>
 <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
-<img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge"/>
 <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge"/>
 <img src="https://img.shields.io/github/stars/yourusername/Focus-Engine-Pro?style=for-the-badge&color=yellow"/>
 
@@ -201,7 +200,7 @@ Focus Engine Pro makes real, active changes to your Windows OS — including mod
 ---
 
 <div align="center">
-
-Built with 🔥 by students, for students · Licensed under MIT
+<h2>Made with ❤️ in INDIA By <i>ATHARVOECH-THE WORLD OF INFINTE CREATIVITY</i></h2>
+© 2026 Atharvotech(Atharv Shukla). All Rights Reserved. This is a personal project and is currently closed for external distribution or modification.
 
 </div>
