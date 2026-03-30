@@ -67,6 +67,7 @@ class APIServer:
         self._shutdown_event = asyncio.Event()
         self._clients = set()
         self.on_shutdown = None  # Callback to trigger engine shutdown
+        self._event_loop = None  # Store reference to the event loop for cross-thread calls
 
     async def handler(self, websocket):
         """Handle a single WebSocket connection."""
@@ -149,9 +150,15 @@ class APIServer:
             return {"action": "current_activity", "app": "Unknown", "category": "other"}
 
         elif action == "get_spotify":
+            today = data.get("date", datetime.date.today().isoformat())
+            spotify_time = db.get_spotify_screen_time(today)
             if self.tracker:
-                return {"action": "spotify", "history": self.tracker.get_spotify_history()}
-            return {"action": "spotify", "history": []}
+                return {
+                    "action": "spotify",
+                    "history": self.tracker.get_spotify_history(),
+                    "listening_seconds": spotify_time,
+                }
+            return {"action": "spotify", "history": [], "listening_seconds": spotify_time}
 
         elif action == "get_settings":
             return {"action": "settings", "data": db.get_all_settings()}
@@ -163,6 +170,10 @@ class APIServer:
         elif action == "get_web_blocked":
             date = data.get("date", datetime.date.today().isoformat())
             return {"action": "web_blocked", "data": db.get_web_blocked_log(date)}
+
+        elif action == "get_recent_web":
+            limit = data.get("limit", 20)
+            return {"action": "recent_web", "data": db.get_recent_web_activity(limit)}
 
         elif action == "get_streak":
             return {"action": "streak", "days": db.get_streak()}
@@ -364,6 +375,7 @@ def start_api_server(auth: AuthManager, app_killer=None, tracker=None, dns_block
     def _run():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        api._event_loop = loop
 
         async def _serve():
             async with websockets.serve(api.handler, "127.0.0.1", port):
@@ -374,4 +386,80 @@ def start_api_server(auth: AuthManager, app_killer=None, tracker=None, dns_block
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
+
+    # --- Server-Push: broadcast stats after tracker flushes ---
+    def on_tracker_flush():
+        """Called from the tracker thread after data is flushed to DB.
+        Schedules a broadcast of updated stats to all dashboard clients."""
+        if not api._event_loop or not api._clients:
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(_broadcast_update(api), api._event_loop)
+        except Exception:
+            pass
+
+    async def _broadcast_update(api_server):
+        """Build fresh stats payload and broadcast to all connected clients."""
+        try:
+            today = datetime.date.today().isoformat()
+            categories = db.get_category_totals(today)
+            total_sec = sum(categories.values())
+            tokens = db.get_token_balance()
+            streak = db.get_streak()
+            hourly = db.get_hourly_breakdown(today)
+
+            stats_msg = {
+                "action": "stats",
+                "period": "day",
+                "date": today,
+                "total_screen_seconds": total_sec,
+                "categories": categories,
+                "screen_time": db.get_screen_time_stats(today),
+                "web_time": db.get_web_time_stats(today),
+                "hourly": hourly,
+                "top_apps": db.get_top_apps(today),
+                "token_balance": tokens,
+                "streak": streak,
+            }
+            await api_server.broadcast(stats_msg)
+
+            # Also push token balance
+            token_history = db.get_token_history(today)
+            await api_server.broadcast({
+                "action": "tokens",
+                "balance": tokens,
+                "history": token_history,
+            })
+
+            # Push current activity
+            if api_server.tracker:
+                activity = api_server.tracker.get_current_activity()
+                await api_server.broadcast({"action": "current_activity", **activity})
+
+                # Push Spotify
+                spotify_time = db.get_spotify_screen_time(today)
+                await api_server.broadcast({
+                    "action": "spotify",
+                    "history": api_server.tracker.get_spotify_history(),
+                    "listening_seconds": spotify_time,
+                })
+
+            # Push category totals
+            await api_server.broadcast({
+                "action": "category_totals",
+                "data": categories,
+            })
+
+            # Push recent web
+            await api_server.broadcast({
+                "action": "recent_web",
+                "data": db.get_recent_web_activity(20),
+            })
+        except Exception as e:
+            print(f"  [!] Broadcast error: {e}")
+
+    # Hook the tracker's on_flush callback
+    if tracker:
+        tracker.on_flush = on_tracker_flush
+
     return api

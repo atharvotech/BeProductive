@@ -3,6 +3,9 @@
  * 
  * Connects to WebSocket, renders charts with Chart.js,
  * manages navigation, settings, and the password modal.
+ * 
+ * Architecture: Server-Push — the backend broadcasts updated data
+ * after each tracker flush (~30 seconds). No client-side polling needed.
  */
 
 // ═══════════════════════════════════════════════════════════
@@ -10,7 +13,6 @@
 // ═══════════════════════════════════════════════════════════
 
 const WS_URL = "ws://localhost:8765";
-const REFRESH_INTERVAL = 5000;  // 5 seconds
 const CATEGORY_COLORS = {
     study:         { bg: "rgba(16, 185, 129, 0.7)",  border: "#10b981" },
     gaming:        { bg: "rgba(239, 68, 68, 0.7)",   border: "#ef4444" },
@@ -29,11 +31,11 @@ let ws = null;
 let wsConnected = false;
 let reconnectDelay = 1000;
 let reconnectTimer = null;
-let pendingCallbacks = {};
-let callbackId = 0;
 
 function connectWebSocket() {
     if (ws && ws.readyState === WebSocket.OPEN) return;
+
+    showConnectionBanner(true);
 
     try {
         ws = new WebSocket(WS_URL);
@@ -42,7 +44,9 @@ function connectWebSocket() {
             wsConnected = true;
             reconnectDelay = 1000;
             updateEngineStatus(true);
-            console.log("[Dashboard] WebSocket connected");
+            showConnectionBanner(false);
+            console.log("[Dashboard] WebSocket connected — server will push updates");
+            // Request initial data once; server will push updates after each flush
             refreshAllData();
         };
 
@@ -58,6 +62,7 @@ function connectWebSocket() {
         ws.onclose = () => {
             wsConnected = false;
             updateEngineStatus(false);
+            showConnectionBanner(true);
             scheduleReconnect();
         };
 
@@ -85,6 +90,7 @@ function sendWS(data) {
 
 function updateEngineStatus(active) {
     const indicator = document.getElementById("engine-status-indicator");
+    if (!indicator) return;
     const dot = indicator.querySelector(".status-dot");
     const text = indicator.querySelector(".status-text");
     if (active) {
@@ -94,6 +100,12 @@ function updateEngineStatus(active) {
         dot.classList.remove("active");
         text.textContent = "Disconnected";
     }
+}
+
+function showConnectionBanner(show) {
+    const banner = document.getElementById("connection-banner");
+    if (!banner) return;
+    banner.classList.toggle("hidden", !show);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -130,8 +142,11 @@ function handleMessage(data) {
         case "web_blocked":
             renderBlockedLog(data.data);
             break;
+        case "recent_web":
+            renderRecentWeb(data.data);
+            break;
         case "spotify":
-            renderSpotifyHistory(data.history);
+            renderSpotifyHistory(data.history, data.listening_seconds);
             break;
         case "streak":
             animateNumber("stat-streak", data.days);
@@ -216,7 +231,8 @@ function handleError(data) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Data Refresh
+// Data Refresh — only on initial connect & page navigation
+// Server pushes updates automatically after each tracker flush
 // ═══════════════════════════════════════════════════════════
 
 function refreshAllData() {
@@ -231,28 +247,27 @@ function refreshAllData() {
     sendWS({ action: "get_category_totals", date: today });
     sendWS({ action: "get_web_stats", date: today });
     sendWS({ action: "get_web_blocked", date: today });
+    sendWS({ action: "get_recent_web" });
     sendWS({ action: "get_spotify" });
     sendWS({ action: "get_settings" });
     sendWS({ action: "get_blocked_apps" });
 }
 
+// No periodic polling needed — server pushes data on change.
+// Only poll current_activity every 3s for the live feed (minimal).
 setInterval(() => {
     if (wsConnected) {
-        const today = new Date().toISOString().split("T")[0];
-        sendWS({ action: "get_stats", period: "day", date: today });
-        sendWS({ action: "get_tokens" });
         sendWS({ action: "get_current_activity" });
-        sendWS({ action: "get_focus_mode" });
-        sendWS({ action: "get_category_totals", date: today });
     }
-}, REFRESH_INTERVAL);
+}, 3000);
 
 // ═══════════════════════════════════════════════════════════
 // Helper Functions
 // ═══════════════════════════════════════════════════════════
 
 function formatTime(seconds) {
-    if (!seconds || seconds < 0) return "0m";
+    if (!seconds || seconds < 0) return "0s";
+    if (seconds < 60) return `${Math.round(seconds)}s`;
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     if (h > 0) return `${h}h ${m}m`;
@@ -283,6 +298,8 @@ function animateTimeValue(elementId, totalSeconds) {
     const el = document.getElementById(elementId);
     if (!el) return;
     el.textContent = formatTime(totalSeconds);
+    // Remove shimmer on first real data
+    el.classList.remove("shimmer-text");
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -325,14 +342,28 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 
 function renderDailyActivityChart(hourly) {
     const ctx = document.getElementById("chart-daily-activity");
+    const emptyState = document.getElementById("daily-chart-empty");
     if (!ctx) return;
+
+    const hasData = hourly.some(h =>
+        (h.study || 0) + (h.gaming || 0) + (h.social || 0) +
+        (h.entertainment || 0) + (h.productivity || 0) + (h.other || 0) > 0
+    );
+
+    if (!hasData && emptyState) {
+        emptyState.classList.remove("hidden");
+        ctx.style.display = "none";
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+    ctx.style.display = "block";
 
     const labels = hourly.map(h => `${h.hour}:00`);
     const categories = ["study", "gaming", "social", "entertainment", "productivity", "other", "idle"];
 
     const datasets = categories.map(cat => ({
         label: cat.charAt(0).toUpperCase() + cat.slice(1),
-        data: hourly.map(h => Math.round((h[cat] || 0) / 60)),  // minutes
+        data: hourly.map(h => Math.round((h[cat] || 0) / 60)),
         backgroundColor: CATEGORY_COLORS[cat]?.bg || "rgba(255,255,255,0.1)",
         borderColor: CATEGORY_COLORS[cat]?.border || "#555",
         borderWidth: 1,
@@ -370,11 +401,21 @@ function renderDailyActivityChart(hourly) {
 
 function renderCategoryDonut(categories) {
     const ctx = document.getElementById("chart-category-donut");
+    const emptyState = document.getElementById("category-chart-empty");
     if (!ctx) return;
 
     const filtered = Object.entries(categories).filter(([_, v]) => v > 0);
+
+    if (filtered.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        ctx.style.display = "none";
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+    ctx.style.display = "block";
+
     const labels = filtered.map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
-    const values = filtered.map(([_, v]) => Math.round(v / 60)); // minutes
+    const values = filtered.map(([_, v]) => Math.round(v / 60));
     const colors = filtered.map(([k]) => CATEGORY_COLORS[k]?.bg || "rgba(255,255,255,0.1)");
     const borders = filtered.map(([k]) => CATEGORY_COLORS[k]?.border || "#555");
 
@@ -416,7 +457,18 @@ function renderCategoryDonut(categories) {
 
 function renderTopApps(apps) {
     const ctx = document.getElementById("chart-top-apps");
+    const emptyState = document.getElementById("top-apps-empty");
     if (!ctx) return;
+
+    if (!apps || apps.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        ctx.style.display = "none";
+        const tableContainer = document.getElementById("app-usage-table");
+        if (tableContainer) tableContainer.innerHTML = `<p class="empty-text">No usage data yet. The tracker logs data every 30 seconds.</p>`;
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+    ctx.style.display = "block";
 
     const labels = apps.map(a => a.app_name.replace(".exe", ""));
     const values = apps.map(a => Math.round(a.total_sec / 60));
@@ -472,7 +524,21 @@ function renderTopApps(apps) {
 
 function renderWebStats(webData) {
     const ctx = document.getElementById("chart-top-websites");
+    const emptyState = document.getElementById("web-chart-empty");
     if (!ctx) return;
+
+    if (!webData || webData.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        ctx.style.display = "none";
+        // Hide web categories chart too
+        const catCtx = document.getElementById("chart-web-categories");
+        const catEmpty = document.getElementById("web-cat-empty");
+        if (catCtx) catCtx.style.display = "none";
+        if (catEmpty) catEmpty.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+    ctx.style.display = "block";
 
     const top = webData.slice(0, 10);
     const labels = top.map(w => w.domain);
@@ -512,12 +578,21 @@ function renderWebStats(webData) {
 
     // Web categories donut
     const catCtx = document.getElementById("chart-web-categories");
+    const catEmpty = document.getElementById("web-cat-empty");
     if (catCtx) {
         const catMap = {};
         webData.forEach(w => {
             catMap[w.category] = (catMap[w.category] || 0) + w.total_sec;
         });
         const catEntries = Object.entries(catMap).filter(([_, v]) => v > 0);
+
+        if (catEntries.length === 0) {
+            catCtx.style.display = "none";
+            if (catEmpty) catEmpty.classList.remove("hidden");
+            return;
+        }
+        catCtx.style.display = "block";
+        if (catEmpty) catEmpty.classList.add("hidden");
 
         if (webCategoriesChart) {
             webCategoriesChart.data.labels = catEntries.map(([k]) => k);
@@ -549,8 +624,8 @@ function renderBlockedLog(blocked) {
     const container = document.getElementById("blocked-log");
     if (!container) return;
 
-    if (blocked.length === 0) {
-        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">No blocked attempts today 🎉</p>`;
+    if (!blocked || blocked.length === 0) {
+        container.innerHTML = `<p class="empty-text">No blocked attempts today 🎉</p>`;
         return;
     }
 
@@ -568,6 +643,41 @@ function renderBlockedLog(blocked) {
     container.innerHTML = html;
 }
 
+// ─── Recent Websites (overview + web activity) ───────────────────────────
+
+function renderRecentWeb(data) {
+    // Render in overview
+    const overviewContainer = document.getElementById("recent-websites");
+    // Render in web activity page
+    const webContainer = document.getElementById("recent-web-table");
+
+    const html = buildRecentWebHTML(data);
+    if (overviewContainer) overviewContainer.innerHTML = html;
+    if (webContainer) webContainer.innerHTML = html;
+}
+
+function buildRecentWebHTML(data) {
+    if (!data || data.length === 0) {
+        return `<p class="empty-text">No web activity recorded yet. Make sure the Chrome extension is installed and syncing.</p>`;
+    }
+
+    let html = `<table class="data-table">
+        <thead><tr><th>Time</th><th>Domain</th><th>Page</th><th>Category</th><th>Time</th></tr></thead><tbody>`;
+    data.forEach(w => {
+        const time = w.timestamp ? new Date(w.timestamp).toLocaleTimeString() : "";
+        const title = (w.page_title || "").substring(0, 50) + ((w.page_title || "").length > 50 ? "…" : "");
+        html += `<tr>
+            <td class="text-muted">${time}</td>
+            <td><strong>${w.domain}</strong></td>
+            <td class="text-ellipsis">${title}</td>
+            <td><span class="activity-category ${w.category}">${w.category}</span></td>
+            <td>${formatTime(w.seconds || 0)}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    return html;
+}
+
 // ─── Heatmap ─────────────────────────────────────────────────────────────
 
 function renderHeatmap(hourly) {
@@ -578,9 +688,8 @@ function renderHeatmap(hourly) {
     hourly.forEach(h => {
         const total = (h.study || 0) + (h.gaming || 0) + (h.social || 0) +
                       (h.entertainment || 0) + (h.productivity || 0) + (h.other || 0);
-        const intensity = Math.min(total / 3600, 1); // Max 1 hour = full intensity
+        const intensity = Math.min(total / 3600, 1);
 
-        // Color based on dominant category
         const cats = { study: h.study || 0, gaming: h.gaming || 0, entertainment: h.entertainment || 0 };
         const dominant = Object.entries(cats).sort((a, b) => b[1] - a[1])[0];
         let color;
@@ -600,7 +709,6 @@ function renderHeatmap(hourly) {
     });
     html += '</div>';
 
-    // Labels
     html += '<div class="heatmap-labels">';
     for (let i = 0; i < 24; i++) {
         html += `<div class="heatmap-label">${i}</div>`;
@@ -618,6 +726,12 @@ function renderLiveActivity(data) {
     const container = document.getElementById("live-activity");
     if (!container) return;
 
+    // Deduplicate consecutive same-app entries
+    const lastItem = activityHistory[0];
+    if (lastItem && lastItem.app === data.app && lastItem.title === (data.title || "").substring(0, 80)) {
+        return; // Same as last, skip
+    }
+
     activityHistory.unshift({
         app: data.app || "Unknown",
         title: (data.title || "").substring(0, 80),
@@ -625,13 +739,18 @@ function renderLiveActivity(data) {
         time: new Date().toLocaleTimeString(),
     });
 
-    // Keep last 20
     if (activityHistory.length > 20) activityHistory.pop();
 
     container.innerHTML = activityHistory.map(a => `
         <div class="activity-item">
-            <span class="activity-app">${a.app}${a.title ? " — " + a.title : ""}</span>
-            <span class="activity-category ${a.category}">${a.category}</span>
+            <div class="activity-details">
+                <span class="activity-app">${a.app}</span>
+                <span class="activity-title">${a.title ? " — " + a.title : ""}</span>
+            </div>
+            <div class="activity-meta">
+                <span class="activity-time">${a.time}</span>
+                <span class="activity-category ${a.category}">${a.category}</span>
+            </div>
         </div>
     `).join("");
 
@@ -639,33 +758,50 @@ function renderLiveActivity(data) {
     if (data.spotify && data.spotify.playing) {
         const el = document.getElementById("stat-now-playing");
         if (el) el.textContent = `${data.spotify.track} — ${data.spotify.artist}`;
+        // Show equalizer animation
+        const eq = document.getElementById("equalizer-anim");
+        if (eq) eq.classList.add("playing");
+    } else {
+        const eq = document.getElementById("equalizer-anim");
+        if (eq) eq.classList.remove("playing");
     }
 }
 
 // ─── Spotify ─────────────────────────────────────────────────────────────
 
-function renderSpotifyHistory(history) {
+function renderSpotifyHistory(history, listeningSeconds) {
     const container = document.getElementById("spotify-history");
     if (!container) return;
 
+    // Update listening time stat
+    const timeEl = document.getElementById("stat-spotify-time");
+    if (timeEl && listeningSeconds !== undefined) {
+        timeEl.textContent = formatTime(listeningSeconds);
+    }
+
     if (!history || history.length === 0) {
-        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">No Spotify tracks recorded yet 🎵</p>`;
+        container.innerHTML = `<p class="empty-text">No Spotify tracks recorded yet 🎵<br><small>Open Spotify and it will be tracked automatically via the window title.</small></p>`;
         return;
     }
 
-    container.innerHTML = history.map(t => `
-        <div class="track-item">
-            <span class="track-icon">🎵</span>
+    // Render in REVERSE order (most recent first) — history comes oldest-first from backend
+    const reversed = [...history].reverse();
+
+    container.innerHTML = reversed.map((t, i) => `
+        <div class="track-item ${i === 0 ? 'now-playing' : ''}">
+            <div class="track-icon-container">
+                ${i === 0 ? '<div class="mini-equalizer"><span></span><span></span><span></span></div>' : '<span class="track-icon">🎵</span>'}
+            </div>
             <div class="track-info">
                 <div class="track-name">${t.track || "Unknown Track"}</div>
                 <div class="track-artist">${t.artist || "Unknown Artist"}</div>
             </div>
-            <span class="track-time">${t.time ? new Date(t.time).toLocaleTimeString() : ""}</span>
+            <div class="track-meta">
+                ${t.duration ? `<span class="track-duration">${formatTime(t.duration)}</span>` : ''}
+                <span class="track-time">${t.time ? new Date(t.time).toLocaleTimeString() : ""}</span>
+            </div>
         </div>
     `).join("");
-
-    // Calculate total Spotify time from screen_time data
-    // (This is an approximation — actual value comes from stats)
 }
 
 // ─── Tokens ──────────────────────────────────────────────────────────────
@@ -684,7 +820,7 @@ function renderTokenLog(history) {
     if (!container) return;
 
     if (history.length === 0) {
-        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">No token transactions yet</p>`;
+        container.innerHTML = `<p class="empty-text">No token transactions yet</p>`;
         return;
     }
 
@@ -710,7 +846,6 @@ function renderTokenChart(history) {
     const ctx = document.getElementById("chart-token-history");
     if (!ctx || history.length === 0) return;
 
-    // Group by date
     const byDate = {};
     history.forEach(t => {
         if (!byDate[t.date]) byDate[t.date] = { earned: 0, spent: 0 };
@@ -718,7 +853,7 @@ function renderTokenChart(history) {
         byDate[t.date].spent += t.spent || 0;
     });
 
-    const dates = Object.keys(byDate).sort().slice(-14); // Last 14 days
+    const dates = Object.keys(byDate).sort().slice(-14);
     const earned = dates.map(d => byDate[d].earned);
     const spent = dates.map(d => -byDate[d].spent);
 
@@ -771,7 +906,6 @@ function updateFocusMode(data) {
         btn.classList.toggle("active", btn.dataset.value === mode);
     });
 
-    // Show gaming warning
     const banner = document.getElementById("gaming-warning-banner");
     const warningText = document.getElementById("gaming-warning-text");
     if (data.warning && data.warning.length > 0) {
@@ -787,41 +921,34 @@ function updateFocusMode(data) {
 function loadSettings(settings) {
     if (!settings) return;
 
-    // Focus mode toggle
     const focusMode = settings.focus_mode || "off";
     document.querySelectorAll("#focus-mode-toggle .toggle-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.value === focusMode);
     });
 
-    // DNS toggle
     const dnsBlocking = settings.dns_blocking || "on";
     document.querySelectorAll("#dns-toggle .toggle-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.value === dnsBlocking);
     });
 
-    // Threshold
     const threshold = document.getElementById("auto-focus-threshold");
     if (threshold) threshold.value = settings.auto_focus_threshold_min || "30";
 
-    // Token rates
     const earnRate = document.getElementById("token-earn-rate");
     if (earnRate) earnRate.value = settings.token_earn_rate || "30";
     const deductRate = document.getElementById("token-deduct-rate");
     if (deductRate) deductRate.value = settings.token_deduct_rate || "15";
 
-    // Blocked/whitelisted apps
     const blockedApps = document.getElementById("blocked-apps-list");
     if (blockedApps) blockedApps.value = (settings.blocked_apps_custom || "").replace(/,/g, "\n");
     const whitelistedApps = document.getElementById("whitelisted-apps-list");
     if (whitelistedApps) whitelistedApps.value = (settings.whitelisted_apps || "").replace(/,/g, "\n");
 
-    // Whitelisted channels
     const channels = document.getElementById("whitelisted-channels");
     if (channels) channels.value = (settings.whitelisted_channels || "").replace(/,/g, "\n");
 }
 
 function renderBlockedApps(data) {
-    // Update textarea with current blacklist
     const el = document.getElementById("blocked-apps-list");
     if (el && data.user_blacklist) {
         el.value = data.user_blacklist.join("\n");
@@ -849,6 +976,7 @@ function showPasswordModal(title, message, callback, action = null) {
     document.getElementById("modal-error").classList.add("hidden");
     document.getElementById("modal-lockout").classList.add("hidden");
     document.getElementById("modal-extra-fields").innerHTML = "";
+    document.getElementById("modal-password").style.display = "";
     document.getElementById("password-modal").classList.remove("hidden");
     document.getElementById("modal-password").focus();
 }
@@ -863,9 +991,8 @@ function showModalError(message) {
     const el = document.getElementById("modal-error");
     el.textContent = message;
     el.classList.remove("hidden");
-    // Re-trigger shake animation
     el.style.animation = "none";
-    el.offsetHeight; // Trigger reflow
+    el.offsetHeight;
     el.style.animation = "shake 0.4s ease";
 }
 
@@ -903,17 +1030,15 @@ function showToast(message, type = "info") {
 // ═══════════════════════════════════════════════════════════
 
 function navigateTo(page) {
-    // Update active nav link
     document.querySelectorAll(".nav-link").forEach(link => {
         link.classList.toggle("active", link.dataset.page === page);
     });
 
-    // Show active page
     document.querySelectorAll(".page").forEach(p => {
         p.classList.toggle("active", p.id === `page-${page}`);
     });
 
-    // Refresh page-specific data
+    // Refresh page-specific data on navigation
     const today = new Date().toISOString().split("T")[0];
     if (page === "screentime") {
         sendWS({ action: "get_top_apps", date: today });
@@ -921,8 +1046,10 @@ function navigateTo(page) {
     } else if (page === "webactivity") {
         sendWS({ action: "get_web_stats", date: today });
         sendWS({ action: "get_web_blocked", date: today });
+        sendWS({ action: "get_recent_web" });
     } else if (page === "spotify") {
         sendWS({ action: "get_spotify" });
+        sendWS({ action: "get_current_activity" });
     } else if (page === "tokens") {
         sendWS({ action: "get_tokens" });
     } else if (page === "settings") {
@@ -975,7 +1102,6 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.addEventListener("click", () => {
             const target = btn.dataset.value;
             if (target === "off") {
-                // Turning OFF requires password
                 showPasswordModal("🔐 Disable Focus Mode",
                     "Enter your admin password to turn off Focus Mode.",
                     (verified) => {
@@ -986,7 +1112,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 );
             } else {
-                // Turning ON doesn't need password
                 sendWS({ action: "toggle_focus_mode", target: "on", password: "" });
             }
         });
@@ -1140,14 +1265,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Default: verify password for the callback
         if (!password) {
             showModalError("Please enter your password.");
             return;
         }
 
         if (currentModalCallback) {
-            // Send verification and wait for result
             sendWS({ action: "verify_password", password });
         }
     });
@@ -1183,7 +1306,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // ─── Period Charts  ──────────────────────────────────────────────────────
 
 function renderPeriodChart(data) {
-    // Render monthly or yearly data in the top-apps chart context
     const ctx = document.getElementById("chart-top-apps");
     if (!ctx) return;
 
@@ -1193,7 +1315,7 @@ function renderPeriodChart(data) {
 
     const datasets = categories.map(cat => ({
         label: cat.charAt(0).toUpperCase() + cat.slice(1),
-        data: items.map(i => Math.round((i[cat] || 0) / 3600)),  // hours
+        data: items.map(i => Math.round((i[cat] || 0) / 3600)),
         backgroundColor: CATEGORY_COLORS[cat]?.bg,
         borderRadius: 3,
     }));

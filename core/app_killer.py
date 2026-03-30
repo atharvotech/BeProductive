@@ -28,19 +28,19 @@ class AppKiller:
         "mojang", "mihoyo", "hoyoverse", "garena",
     ]
 
-    # Known game exe patterns (fallback)
+    # Known game exe patterns (fallback) — use \b word boundaries to avoid false matches
     GAME_EXE_PATTERNS = [
-        r"(?i)valorant", r"(?i)fortnite", r"(?i)gta[v5]",
-        r"(?i)csgo|cs2", r"(?i)pubg", r"(?i)apex",
-        r"(?i)overwatch", r"(?i)minecraft", r"(?i)roblox",
-        r"(?i)call.?of.?duty|cod", r"(?i)dota", r"(?i)league",
-        r"(?i)rocket.?league", r"(?i)rainbow.?six|r6",
-        r"(?i)destiny", r"(?i)warframe", r"(?i)ark",
-        r"(?i)rust(?!c)", r"(?i)among.?us", r"(?i)fall.?guys",
-        r"(?i)genshin", r"(?i)honkai", r"(?i)elden.?ring",
-        r"(?i)dark.?souls", r"(?i)cyberpunk", r"(?i)witcher",
-        r"(?i)battlefield|bf[0-9]", r"(?i)fifa|fc[0-9]",
-        r"(?i)nba2k|nba.?2k", r"(?i)madden", r"(?i)civilization",
+        r"(?i)\bvalorant", r"(?i)\bfortnite", r"(?i)\bgta[v5]",
+        r"(?i)\bcsgo\b|\bcs2\b", r"(?i)\bpubg", r"(?i)\bapex(?:legends)?",
+        r"(?i)\boverwatch", r"(?i)\bminecraft", r"(?i)\broblox",
+        r"(?i)\bcall.?of.?duty\b|\bcod\b", r"(?i)\bdota\b", r"(?i)\bleague",
+        r"(?i)\brocket.?league", r"(?i)\brainbow.?six\b|\br6\b",
+        r"(?i)\bdestiny\b", r"(?i)\bwarframe\b", r"(?i)\bark\b",
+        r"(?i)\brust\b(?!c)", r"(?i)\bamong.?us", r"(?i)\bfall.?guys",
+        r"(?i)\bgenshin", r"(?i)\bhonkai", r"(?i)\belden.?ring",
+        r"(?i)\bdark.?souls", r"(?i)\bcyberpunk", r"(?i)\bwitcher",
+        r"(?i)\bbattlefield\b|\bbf[0-9]", r"(?i)\bfifa\b|\bfc[0-9]",
+        r"(?i)\bnba2k\b|\bnba.?2k", r"(?i)\bmadden\b", r"(?i)\bcivilization",
     ]
 
     # Study / productivity apps — NEVER kill these
@@ -64,7 +64,26 @@ class AppKiller:
         "steam.exe", "steamwebhelper.exe", "steamservice.exe",
         "desktopmate.exe", 
         "epicgameslauncher.exe", "unrealcefsubprocess.exe",
+        # System services & analytics — must never be killed
+        "touchpointanalyticsclientsservice.exe",
+        "svchost.exe", "services.exe", "csrss.exe", "lsass.exe",
+        "wininit.exe", "winlogon.exe", "dwm.exe", "taskhostw.exe",
+        "runtimebroker.exe", "sihost.exe", "fontdrvhost.exe",
+        "searchhost.exe", "startmenuexperiencehost.exe",
+        "textinputhost.exe", "shellexperiencehost.exe",
+        "applicationframehost.exe", "systemsettings.exe",
+        "securityhealthservice.exe", "msmpeng.exe",
+        "smartscreen.exe", "ctfmon.exe", "conhost.exe",
+        "dllhost.exe", "msiexec.exe", "wmiprvse.exe",
     }
+
+    # System directories — never kill exes from these paths
+    SAFE_EXE_PATHS = [
+        r"c:\windows",
+        r"c:\program files\common files",
+        r"c:\program files (x86)\common files",
+        r"c:\programdata\microsoft",
+    ]
 
     def __init__(self):
         self.steam_game_exes = set()
@@ -178,6 +197,12 @@ class AppKiller:
         all_whitelist = self.STUDY_APPS | self.DEFAULT_WHITELIST | self.user_whitelist
         if name in all_whitelist:
             return False
+
+        # Skip processes from system directories
+        if exe_path:
+            for safe_path in self.SAFE_EXE_PATHS:
+                if exe_path.startswith(safe_path):
+                    return False
 
         # Check user blacklist (explicitly blocked)
         if name in self.user_blacklist:

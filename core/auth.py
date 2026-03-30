@@ -46,6 +46,7 @@ class AuthManager:
 
     def __init__(self):
         self._locked_handles = []  # open file handles to keep locked
+        self._config_handle = None  # reference to the locked config file handle
         self._config = self._load_config()
 
     # ── Config I/O ────────────────────────────────────────────────────────
@@ -60,7 +61,19 @@ class AuthManager:
             return {}
 
     def _save_config(self):
+        """Save config. If the file is locked by us, write through the locked handle."""
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        if self._config_handle:
+            try:
+                self._config_handle.seek(0)
+                self._config_handle.truncate()
+                self._config_handle.write(json.dumps(self._config, indent=2, default=str).encode("utf-8"))
+                self._config_handle.flush()
+                os.fsync(self._config_handle.fileno())
+                return
+            except Exception:
+                pass  # Fall through to direct write
+        # Not locked or locked-write failed — direct write
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(self._config, f, indent=2, default=str)
 
@@ -178,11 +191,11 @@ class AuthManager:
     # ── File locking (prevent edits while running) ────────────────────────
 
     def lock_config_files(self):
-        """Open config and DB files with exclusive access to prevent tampering."""
+        """Open config files with exclusive access to prevent tampering.
+        Note: data.db is NOT locked here — SQLite's WAL mode handles its own
+        concurrency, and locking via msvcrt conflicts with it (causes disk I/O errors).
+        """
         files_to_lock = [CONFIG_FILE]
-        db_path = os.path.join(_base_dir(), "core", "data.db")
-        if os.path.exists(db_path):
-            files_to_lock.append(db_path)
 
         for fpath in files_to_lock:
             if not os.path.exists(fpath):
@@ -193,6 +206,9 @@ class AuthManager:
                 # Lock the first byte exclusively using Windows msvcrt
                 msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
                 self._locked_handles.append(handle)
+                # Keep reference to config handle for save operations
+                if fpath == CONFIG_FILE:
+                    self._config_handle = handle
             except (IOError, OSError):
                 pass  # If we can't lock, continue — better than crashing
 

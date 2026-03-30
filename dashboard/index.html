@@ -12,6 +12,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
+    <!-- Connection Status Banner -->
+    <div id="connection-banner" class="connection-banner hidden">
+        <span class="connection-icon">⚡</span>
+        <span class="connection-text">Connecting to Focus Engine...</span>
+    </div>
+
     <!-- Sidebar Navigation -->
     <nav id="sidebar" class="sidebar">
         <div class="sidebar-header">
@@ -68,14 +74,18 @@
                 <div class="stat-card study-card">
                     <div class="stat-icon">📖</div>
                     <div class="stat-info">
-                        <div class="stat-value" id="stat-study-time">0h 0m</div>
+                        <div class="stat-value" id="stat-study-time">
+                            <span class="shimmer-text">0h 0m</span>
+                        </div>
                         <div class="stat-label">Study Time Today</div>
                     </div>
                 </div>
                 <div class="stat-card screen-card">
                     <div class="stat-icon">🖥️</div>
                     <div class="stat-info">
-                        <div class="stat-value" id="stat-screen-time">0h 0m</div>
+                        <div class="stat-value" id="stat-screen-time">
+                            <span class="shimmer-text">0h 0m</span>
+                        </div>
                         <div class="stat-label">Total Screen Time</div>
                     </div>
                 </div>
@@ -102,11 +112,19 @@
                         <h3>Today's Activity</h3>
                         <div class="chart-legend" id="activity-legend"></div>
                     </div>
+                    <div class="chart-empty-state hidden" id="daily-chart-empty">
+                        <span class="empty-icon">📊</span>
+                        <p>Activity data will appear here as you use your computer</p>
+                    </div>
                     <canvas id="chart-daily-activity"></canvas>
                 </div>
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3>Category Breakdown</h3>
+                    </div>
+                    <div class="chart-empty-state hidden" id="category-chart-empty">
+                        <span class="empty-icon">🎯</span>
+                        <p>Category data will appear here shortly</p>
                     </div>
                     <canvas id="chart-category-donut"></canvas>
                 </div>
@@ -123,6 +141,17 @@
                         <span class="activity-app">Waiting for data...</span>
                         <span class="activity-category">—</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Recent Websites -->
+            <div class="card">
+                <div class="chart-header">
+                    <h3>Recent Websites</h3>
+                    <span class="badge-subtle">Latest</span>
+                </div>
+                <div id="recent-websites" class="data-table-container">
+                    <p class="empty-text">No web activity recorded yet. Make sure the Chrome extension is installed.</p>
                 </div>
             </div>
         </section>
@@ -143,6 +172,10 @@
                 <div class="chart-header">
                     <h3>Top Applications</h3>
                 </div>
+                <div class="chart-empty-state hidden" id="top-apps-empty">
+                    <span class="empty-icon">📱</span>
+                    <p>No application data yet. The tracker logs data every 30 seconds.</p>
+                </div>
                 <canvas id="chart-top-apps"></canvas>
             </div>
 
@@ -159,7 +192,9 @@
                 <div class="chart-header">
                     <h3>App Usage Details</h3>
                 </div>
-                <div id="app-usage-table" class="data-table-container"></div>
+                <div id="app-usage-table" class="data-table-container">
+                    <p class="empty-text">No usage data yet</p>
+                </div>
             </div>
         </section>
 
@@ -174,13 +209,32 @@
                     <div class="chart-header">
                         <h3>Top Websites</h3>
                     </div>
+                    <div class="chart-empty-state hidden" id="web-chart-empty">
+                        <span class="empty-icon">🌐</span>
+                        <p>No web data yet. Make sure the Chrome extension is connected and syncing.</p>
+                    </div>
                     <canvas id="chart-top-websites"></canvas>
                 </div>
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3>Web Categories</h3>
                     </div>
+                    <div class="chart-empty-state hidden" id="web-cat-empty">
+                        <span class="empty-icon">🏷️</span>
+                        <p>Category data will appear as websites are tracked</p>
+                    </div>
                     <canvas id="chart-web-categories"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Web Activity Table -->
+            <div class="card">
+                <div class="chart-header">
+                    <h3>Recent Web Activity</h3>
+                    <span class="badge-subtle">Latest</span>
+                </div>
+                <div id="recent-web-table" class="data-table-container">
+                    <p class="empty-text">No web activity recorded yet</p>
                 </div>
             </div>
 
@@ -207,10 +261,14 @@
                         <div class="stat-label">Listening Time Today</div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🎶</div>
+                <div class="stat-card now-playing-card">
+                    <div class="stat-icon">
+                        <div class="equalizer" id="equalizer-anim">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
                     <div class="stat-info">
-                        <div class="stat-value" id="stat-now-playing">Not Playing</div>
+                        <div class="stat-value now-playing-text" id="stat-now-playing">Not Playing</div>
                         <div class="stat-label">Now Playing</div>
                     </div>
                 </div>
@@ -219,8 +277,11 @@
             <div class="card">
                 <div class="chart-header">
                     <h3>Recent Tracks</h3>
+                    <span class="badge-subtle">Latest first</span>
                 </div>
-                <div id="spotify-history" class="spotify-track-list"></div>
+                <div id="spotify-history" class="spotify-track-list">
+                    <p class="empty-text">No Spotify tracks recorded yet 🎵<br><small>Open Spotify and it will be tracked automatically via the window title.</small></p>
+                </div>
             </div>
         </section>
 
@@ -326,15 +387,42 @@
                     <button class="btn btn-secondary" id="btn-save-whitelisted-apps">Save Whitelist</button>
                 </div>
 
+                <!-- Whitelisted Websites (Study Domains) -->
+                <div class="settings-card wide">
+                    <div class="settings-card-header">
+                        <span class="settings-icon">🌐</span>
+                        <h3>Whitelisted Websites (Study)</h3>
+                    </div>
+                    <p class="settings-desc">Domains that should always count as <strong>study time</strong> (one per line). These are allowed in Focus Mode and tracked as study.</p>
+                    <textarea id="whitelisted-websites" class="settings-textarea" placeholder="e.g. geeksforgeeks.org&#10;javatpoint.com&#10;brilliant.org&#10;freecodecamp.org"></textarea>
+                    <button class="btn btn-secondary" id="btn-save-whitelisted-websites">Save Websites</button>
+                </div>
+
                 <!-- Whitelisted YouTube Channels -->
                 <div class="settings-card wide">
                     <div class="settings-card-header">
                         <span class="settings-icon">📺</span>
                         <h3>Whitelisted YouTube Channels</h3>
                     </div>
-                    <p class="settings-desc">YouTube channel names allowed even in Focus Mode (one per line).</p>
+                    <p class="settings-desc">YouTube channel names allowed even in Focus Mode (one per line). The channel name must appear in the video page title.</p>
                     <textarea id="whitelisted-channels" class="settings-textarea" placeholder="e.g. 3Blue1Brown&#10;Fireship&#10;CS Dojo"></textarea>
                     <button class="btn btn-secondary" id="btn-save-channels">Save Channels</button>
+
+                    <!-- YouTube Channel Search -->
+                    <div class="yt-search-section">
+                        <h4 class="subsection-title">🔍 Search & Add YouTube Channels</h4>
+                        <p class="settings-desc">Search for educational channels on YouTube. Click "Add" to whitelist them.</p>
+                        <div class="yt-search-bar">
+                            <input type="text" id="yt-search-input" class="modal-input" placeholder="Search YouTube channels (e.g. 3Blue1Brown, Fireship)">
+                            <button class="btn btn-primary" id="btn-yt-search">Search</button>
+                        </div>
+                        <div id="yt-search-results" class="yt-search-results">
+                            <p class="empty-text">Search for a channel name above</p>
+                        </div>
+                        <div class="yt-embed-container" id="yt-embed-container" style="display:none;">
+                            <iframe id="yt-embed-iframe" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Token Rates -->
