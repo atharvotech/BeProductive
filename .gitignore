@@ -1,0 +1,41 @@
+# --- Focus Engine Pro GitIgnore ---
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database
+core/data.db
+core/database.sqlite
+*.db
+*.sqlite
+
+# Security & Config 
+core/admin_config.json
+*.json.lock
+
+# Environments & Virtual Envs
+venv/
+env/
+.env
+.venv
+pip-log.txt
+setup.cfg
+
+# IDE specific 
+.vscode/
+.antigravity/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+desktop.ini
+
+# Distribution / Packaging
+dist/
+build/
+*.exe
+*.msi
