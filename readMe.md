@@ -7,7 +7,7 @@
 
 <br/><br/>
 
-# 🧠 Focus Engine Pro (SATHI)
+# 🧠 Focus Engine Pro (Atharotech)
 ### *Your AI-Powered Study Partner — Not Just Another Website Blocker*
 
 **The only Windows productivity tool that locks down your entire system, rewards your focus with real points, and fights back when you try to cheat.**
