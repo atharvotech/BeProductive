@@ -906,6 +906,19 @@ function updateFocusMode(data) {
         btn.classList.toggle("active", btn.dataset.value === mode);
     });
 
+    // Update focus mode pill in topbar
+    const pill = document.getElementById("focus-mode-pill");
+    const pillText = pill ? pill.querySelector(".fmp-text") : null;
+    if (pill && pillText) {
+        if (mode === "on") {
+            pill.classList.add("active");
+            pillText.textContent = "Focus ON";
+        } else {
+            pill.classList.remove("active");
+            pillText.textContent = "Focus OFF";
+        }
+    }
+
     const banner = document.getElementById("gaming-warning-banner");
     const warningText = document.getElementById("gaming-warning-text");
     if (data.warning && data.warning.length > 0) {
@@ -1037,6 +1050,11 @@ function navigateTo(page) {
     document.querySelectorAll(".page").forEach(p => {
         p.classList.toggle("active", p.id === `page-${page}`);
     });
+
+    // Update topbar breadcrumb
+    const labels = {overview:"Overview", screentime:"Screen Time", webactivity:"Web Activity", spotify:"Spotify & Audio", tokens:"Study Tokens", settings:"Settings"};
+    const bc = document.getElementById("page-breadcrumb");
+    if (bc) bc.textContent = labels[page] || page;
 
     // Refresh page-specific data on navigation
     const today = new Date().toISOString().split("T")[0];

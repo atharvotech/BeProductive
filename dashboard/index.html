@@ -3,138 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Focus Engine Pro — Your personal digital wellbeing dashboard. Track screen time, manage study tokens, and stay focused.">
     <title>Focus Engine Pro — Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <!-- Connection Status Banner -->
+
+    <div class="bg-particles" aria-hidden="true">
+        <div class="particle p1"></div><div class="particle p2"></div>
+        <div class="particle p3"></div><div class="particle p4"></div><div class="particle p5"></div>
+    </div>
+    <div class="bg-grid" aria-hidden="true"></div>
+
     <div id="connection-banner" class="connection-banner hidden">
-        <span class="connection-icon">⚡</span>
+        <div class="banner-pulse"></div>
+        <span>⚡</span>
         <span class="connection-text">Connecting to Focus Engine...</span>
     </div>
 
-    <!-- Sidebar Navigation -->
+    <!-- Sidebar -->
     <nav id="sidebar" class="sidebar">
         <div class="sidebar-header">
             <div class="logo">
-                <span class="logo-icon">🔥</span>
-                <span class="logo-text">Focus Engine</span>
+                <div class="logo-flame">🔥</div>
+                <div class="logo-text-group">
+                    <span class="logo-text">Focus Engine</span>
+                    <span class="logo-badge">PRO</span>
+                </div>
             </div>
         </div>
+
+        <div class="nav-section-label">MAIN</div>
         <ul class="nav-links">
             <li><a href="#" class="nav-link active" data-page="overview" id="nav-overview">
-                <span class="nav-icon">📊</span><span class="nav-label">Overview</span>
+                <span class="nav-icon">◈</span><span class="nav-label">Overview</span>
+                <span class="nav-indicator"></span>
             </a></li>
             <li><a href="#" class="nav-link" data-page="screentime" id="nav-screentime">
-                <span class="nav-icon">📱</span><span class="nav-label">Screen Time</span>
+                <span class="nav-icon">▣</span><span class="nav-label">Screen Time</span>
+                <span class="nav-indicator"></span>
             </a></li>
             <li><a href="#" class="nav-link" data-page="webactivity" id="nav-webactivity">
-                <span class="nav-icon">🌐</span><span class="nav-label">Web Activity</span>
+                <span class="nav-icon">◎</span><span class="nav-label">Web Activity</span>
+                <span class="nav-indicator"></span>
             </a></li>
             <li><a href="#" class="nav-link" data-page="spotify" id="nav-spotify">
-                <span class="nav-icon">🎵</span><span class="nav-label">Spotify</span>
-            </a></li>
-            <li><a href="#" class="nav-link" data-page="tokens" id="nav-tokens">
-                <span class="nav-icon">🪙</span><span class="nav-label">Tokens</span>
-            </a></li>
-            <li><a href="#" class="nav-link" data-page="settings" id="nav-settings">
-                <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+                <span class="nav-icon">◉</span><span class="nav-label">Spotify</span>
+                <span class="nav-indicator"></span>
             </a></li>
         </ul>
+
+        <div class="nav-section-label">REWARDS</div>
+        <ul class="nav-links">
+            <li><a href="#" class="nav-link" data-page="tokens" id="nav-tokens">
+                <span class="nav-icon">◈</span><span class="nav-label">Tokens</span>
+                <span class="nav-indicator"></span>
+            </a></li>
+        </ul>
+
+        <div class="nav-section-label">SYSTEM</div>
+        <ul class="nav-links">
+            <li><a href="#" class="nav-link" data-page="settings" id="nav-settings">
+                <span class="nav-icon">⊙</span><span class="nav-label">Settings</span>
+                <span class="nav-indicator"></span>
+            </a></li>
+        </ul>
+
         <div class="sidebar-footer">
             <div class="engine-status" id="engine-status-indicator">
                 <span class="status-dot active"></span>
-                <span class="status-text">Engine Active</span>
+                <div class="status-info">
+                    <span class="status-text">Engine Active</span>
+                    <span class="status-sub">All systems running</span>
+                </div>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content Area -->
+    <!-- Main Content -->
     <main id="main-content" class="main-content">
-        <!-- ═══ Overview Page ═══ -->
-        <section id="page-overview" class="page active">
-            <div class="page-header">
-                <h1>Dashboard Overview</h1>
-                <div class="date-display" id="current-date"></div>
-            </div>
 
-            <!-- Gaming Warning Banner -->
+        <!-- Top bar -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <div class="page-breadcrumb" id="page-breadcrumb">Overview</div>
+            </div>
+            <div class="topbar-right">
+                <div class="date-display" id="current-date"></div>
+                <div class="focus-mode-pill" id="focus-mode-pill">
+                    <span class="fmp-dot"></span>
+                    <span class="fmp-text">Focus OFF</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Overview ═══ -->
+        <section id="page-overview" class="page active">
+
             <div id="gaming-warning-banner" class="warning-banner hidden">
                 <span class="warning-icon">⚠️</span>
-                <span id="gaming-warning-text"></span>
+                <div class="warning-content">
+                    <span class="warning-title">Gaming Alert</span>
+                    <span id="gaming-warning-text"></span>
+                </div>
             </div>
 
-            <!-- Stat Cards -->
             <div class="stats-grid">
                 <div class="stat-card study-card">
-                    <div class="stat-icon">📖</div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="stat-study-time">
-                            <span class="shimmer-text">0h 0m</span>
-                        </div>
-                        <div class="stat-label">Study Time Today</div>
-                    </div>
+                    <div class="stat-bg-glow study-glow"></div>
+                    <div class="stat-top"><span class="stat-pill study-pill">📖 Study</span></div>
+                    <div class="stat-value" id="stat-study-time"><span class="shimmer-text">0h 0m</span></div>
+                    <div class="stat-label">Time today</div>
+                    <div class="stat-bar"><div class="stat-bar-fill study-fill" style="width:30%"></div></div>
                 </div>
                 <div class="stat-card screen-card">
-                    <div class="stat-icon">🖥️</div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="stat-screen-time">
-                            <span class="shimmer-text">0h 0m</span>
-                        </div>
-                        <div class="stat-label">Total Screen Time</div>
-                    </div>
+                    <div class="stat-bg-glow screen-glow"></div>
+                    <div class="stat-top"><span class="stat-pill screen-pill">🖥️ Screen</span></div>
+                    <div class="stat-value" id="stat-screen-time"><span class="shimmer-text">0h 0m</span></div>
+                    <div class="stat-label">Total active</div>
+                    <div class="stat-bar"><div class="stat-bar-fill screen-fill" style="width:60%"></div></div>
                 </div>
                 <div class="stat-card token-card">
-                    <div class="stat-icon">🪙</div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="stat-tokens">0</div>
-                        <div class="stat-label">Token Balance</div>
-                    </div>
+                    <div class="stat-bg-glow token-glow"></div>
+                    <div class="stat-top"><span class="stat-pill token-pill">🪙 Tokens</span></div>
+                    <div class="stat-value" id="stat-tokens">0</div>
+                    <div class="stat-label">Balance</div>
+                    <div class="stat-bar"><div class="stat-bar-fill token-fill" style="width:45%"></div></div>
                 </div>
                 <div class="stat-card streak-card">
-                    <div class="stat-icon">🔥</div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="stat-streak">0</div>
-                        <div class="stat-label">Day Streak</div>
-                    </div>
+                    <div class="stat-bg-glow streak-glow"></div>
+                    <div class="stat-top"><span class="stat-pill streak-pill">🔥 Streak</span></div>
+                    <div class="stat-value" id="stat-streak">0</div>
+                    <div class="stat-label">Day streak</div>
+                    <div class="stat-bar"><div class="stat-bar-fill streak-fill" style="width:20%"></div></div>
                 </div>
             </div>
 
-            <!-- Charts Row -->
             <div class="charts-row">
                 <div class="chart-card large">
                     <div class="chart-header">
-                        <h3>Today's Activity</h3>
+                        <div>
+                            <h3>Today's Activity</h3>
+                            <p class="chart-subtitle">Hourly breakdown by category</p>
+                        </div>
                         <div class="chart-legend" id="activity-legend"></div>
                     </div>
                     <div class="chart-empty-state hidden" id="daily-chart-empty">
-                        <span class="empty-icon">📊</span>
+                        <div class="empty-illustration">📊</div>
                         <p>Activity data will appear here as you use your computer</p>
                     </div>
-                    <canvas id="chart-daily-activity"></canvas>
+                    <div class="chart-wrap"><canvas id="chart-daily-activity"></canvas></div>
                 </div>
                 <div class="chart-card">
                     <div class="chart-header">
-                        <h3>Category Breakdown</h3>
+                        <div>
+                            <h3>Categories</h3>
+                            <p class="chart-subtitle">Time distribution</p>
+                        </div>
                     </div>
                     <div class="chart-empty-state hidden" id="category-chart-empty">
-                        <span class="empty-icon">🎯</span>
-                        <p>Category data will appear here shortly</p>
+                        <div class="empty-illustration">🎯</div>
+                        <p>Category data will appear shortly</p>
                     </div>
-                    <canvas id="chart-category-donut"></canvas>
+                    <div class="chart-wrap donut-wrap"><canvas id="chart-category-donut"></canvas></div>
                 </div>
             </div>
 
-            <!-- Live Activity Feed -->
             <div class="card">
                 <div class="chart-header">
-                    <h3>Live Activity</h3>
-                    <span class="live-badge">● LIVE</span>
+                    <div>
+                        <h3>Live Activity</h3>
+                        <p class="chart-subtitle">Real-time window tracking</p>
+                    </div>
+                    <span class="live-badge"><span class="live-dot"></span> LIVE</span>
                 </div>
                 <div id="live-activity" class="live-activity">
                     <div class="activity-item">
@@ -144,10 +188,9 @@
                 </div>
             </div>
 
-            <!-- Recent Websites -->
             <div class="card">
                 <div class="chart-header">
-                    <h3>Recent Websites</h3>
+                    <div><h3>Recent Websites</h3><p class="chart-subtitle">Latest browsing activity</p></div>
                     <span class="badge-subtle">Latest</span>
                 </div>
                 <div id="recent-websites" class="data-table-container">
@@ -156,127 +199,90 @@
             </div>
         </section>
 
-        <!-- ═══ Screen Time Page ═══ -->
+        <!-- ═══ Screen Time ═══ -->
         <section id="page-screentime" class="page">
             <div class="page-header">
-                <h1>Screen Time</h1>
+                <div>
+                    <h1>Screen Time</h1>
+                    <p class="page-subtitle-inline">Track how you spend your time</p>
+                </div>
                 <div class="period-selector">
-                    <button class="period-btn active" data-period="day">Day</button>
+                    <button class="period-btn active" data-period="day">Today</button>
                     <button class="period-btn" data-period="month">Month</button>
                     <button class="period-btn" data-period="year">Year</button>
                 </div>
             </div>
-
-            <!-- Top Apps -->
             <div class="card">
-                <div class="chart-header">
-                    <h3>Top Applications</h3>
-                </div>
-                <div class="chart-empty-state hidden" id="top-apps-empty">
-                    <span class="empty-icon">📱</span>
-                    <p>No application data yet. The tracker logs data every 30 seconds.</p>
-                </div>
-                <canvas id="chart-top-apps"></canvas>
+                <div class="chart-header"><div><h3>Top Applications</h3><p class="chart-subtitle">By time spent</p></div></div>
+                <div class="chart-empty-state hidden" id="top-apps-empty"><div class="empty-illustration">📱</div><p>No application data yet. The tracker logs data every 30 seconds.</p></div>
+                <div class="chart-wrap apps-chart-wrap"><canvas id="chart-top-apps"></canvas></div>
             </div>
-
-            <!-- Hourly Heatmap -->
             <div class="card">
-                <div class="chart-header">
-                    <h3>Hourly Activity Heatmap</h3>
-                </div>
+                <div class="chart-header"><div><h3>Hourly Activity Heatmap</h3><p class="chart-subtitle">Intensity throughout the day</p></div></div>
                 <div id="hourly-heatmap" class="hourly-heatmap"></div>
             </div>
-
-            <!-- App Usage Timeline -->
             <div class="card">
-                <div class="chart-header">
-                    <h3>App Usage Details</h3>
-                </div>
-                <div id="app-usage-table" class="data-table-container">
-                    <p class="empty-text">No usage data yet</p>
-                </div>
+                <div class="chart-header"><div><h3>App Usage Details</h3></div></div>
+                <div id="app-usage-table" class="data-table-container"><p class="empty-text">No usage data yet</p></div>
             </div>
         </section>
 
-        <!-- ═══ Web Activity Page ═══ -->
+        <!-- ═══ Web Activity ═══ -->
         <section id="page-webactivity" class="page">
             <div class="page-header">
-                <h1>Web Activity</h1>
+                <div><h1>Web Activity</h1><p class="page-subtitle-inline">Full browsing breakdown via Chrome Extension</p></div>
             </div>
-
             <div class="charts-row">
                 <div class="chart-card large">
-                    <div class="chart-header">
-                        <h3>Top Websites</h3>
-                    </div>
-                    <div class="chart-empty-state hidden" id="web-chart-empty">
-                        <span class="empty-icon">🌐</span>
-                        <p>No web data yet. Make sure the Chrome extension is connected and syncing.</p>
-                    </div>
-                    <canvas id="chart-top-websites"></canvas>
+                    <div class="chart-header"><div><h3>Top Websites</h3><p class="chart-subtitle">Time per domain</p></div></div>
+                    <div class="chart-empty-state hidden" id="web-chart-empty"><div class="empty-illustration">🌐</div><p>No web data yet. Make sure the Chrome extension is connected.</p></div>
+                    <div class="chart-wrap"><canvas id="chart-top-websites"></canvas></div>
                 </div>
                 <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Web Categories</h3>
-                    </div>
-                    <div class="chart-empty-state hidden" id="web-cat-empty">
-                        <span class="empty-icon">🏷️</span>
-                        <p>Category data will appear as websites are tracked</p>
-                    </div>
-                    <canvas id="chart-web-categories"></canvas>
+                    <div class="chart-header"><div><h3>Web Categories</h3></div></div>
+                    <div class="chart-empty-state hidden" id="web-cat-empty"><div class="empty-illustration">🏷️</div><p>Category data will appear soon</p></div>
+                    <div class="chart-wrap donut-wrap"><canvas id="chart-web-categories"></canvas></div>
                 </div>
             </div>
-
-            <!-- Recent Web Activity Table -->
             <div class="card">
-                <div class="chart-header">
-                    <h3>Recent Web Activity</h3>
-                    <span class="badge-subtle">Latest</span>
-                </div>
-                <div id="recent-web-table" class="data-table-container">
-                    <p class="empty-text">No web activity recorded yet</p>
-                </div>
+                <div class="chart-header"><div><h3>Recent Web Activity</h3></div><span class="badge-subtle">Latest</span></div>
+                <div id="recent-web-table" class="data-table-container"><p class="empty-text">No web activity recorded yet</p></div>
             </div>
-
-            <!-- Blocked Attempts -->
             <div class="card">
                 <div class="chart-header">
-                    <h3>Blocked Attempts</h3>
+                    <div><h3>Blocked Attempts</h3><p class="chart-subtitle">Sites blocked in Focus Mode</p></div>
+                    <span class="shield-badge">🛡️ Protected</span>
                 </div>
                 <div id="blocked-log" class="data-table-container"></div>
             </div>
         </section>
 
-        <!-- ═══ Spotify Page ═══ -->
+        <!-- ═══ Spotify ═══ -->
         <section id="page-spotify" class="page">
             <div class="page-header">
-                <h1>Spotify & Audio</h1>
+                <div><h1>Spotify & Audio</h1><p class="page-subtitle-inline">Your listening habits and track history</p></div>
             </div>
-
             <div class="stats-grid two-col">
                 <div class="stat-card spotify-card">
-                    <div class="stat-icon">🎧</div>
-                    <div class="stat-info">
-                        <div class="stat-value" id="stat-spotify-time">0h 0m</div>
-                        <div class="stat-label">Listening Time Today</div>
-                    </div>
+                    <div class="stat-bg-glow spotify-glow"></div>
+                    <div class="stat-top"><span class="stat-pill spotify-pill">🎧 Audio</span></div>
+                    <div class="stat-value" id="stat-spotify-time">0h 0m</div>
+                    <div class="stat-label">Listening time today</div>
                 </div>
                 <div class="stat-card now-playing-card">
-                    <div class="stat-icon">
+                    <div class="stat-bg-glow nowplay-glow"></div>
+                    <div class="stat-top"><span class="stat-pill nowplay-pill">▶ Now Playing</span></div>
+                    <div class="now-playing-display">
                         <div class="equalizer" id="equalizer-anim">
-                            <span></span><span></span><span></span><span></span>
+                            <span></span><span></span><span></span><span></span><span></span>
                         </div>
-                    </div>
-                    <div class="stat-info">
                         <div class="stat-value now-playing-text" id="stat-now-playing">Not Playing</div>
-                        <div class="stat-label">Now Playing</div>
                     </div>
                 </div>
             </div>
-
             <div class="card">
                 <div class="chart-header">
-                    <h3>Recent Tracks</h3>
+                    <div><h3>Recent Tracks</h3><p class="chart-subtitle">Latest listening activity</p></div>
                     <span class="badge-subtle">Latest first</span>
                 </div>
                 <div id="spotify-history" class="spotify-track-list">
@@ -285,180 +291,159 @@
             </div>
         </section>
 
-        <!-- ═══ Tokens Page ═══ -->
+        <!-- ═══ Tokens ═══ -->
         <section id="page-tokens" class="page">
             <div class="page-header">
-                <h1>Study Tokens</h1>
+                <div><h1>Study Tokens</h1><p class="page-subtitle-inline">Earn by studying. Spend on free time.</p></div>
             </div>
-
             <div class="token-hero">
+                <div class="token-orb">
+                    <div class="token-orb-ring r1"></div>
+                    <div class="token-orb-ring r2"></div>
+                    <div class="token-orb-ring r3"></div>
+                    <div class="token-orb-core">🪙</div>
+                </div>
                 <div class="token-balance-large">
-                    <span class="token-icon">🪙</span>
                     <span class="token-number" id="token-balance-large">0</span>
                     <span class="token-unit">tokens</span>
                 </div>
-                <p class="token-subtitle">Earn tokens by studying. Spend them on free time.</p>
-                <button class="btn btn-accent" id="btn-spend-tokens">Spend Tokens</button>
+                <p class="token-subtitle">Keep studying to earn more rewards</p>
+                <button class="btn btn-accent btn-glow" id="btn-spend-tokens">💸 Spend Tokens</button>
             </div>
-
             <div class="charts-row">
                 <div class="chart-card large">
-                    <div class="chart-header">
-                        <h3>Token History</h3>
-                    </div>
-                    <canvas id="chart-token-history"></canvas>
+                    <div class="chart-header"><div><h3>Token History</h3><p class="chart-subtitle">Earned vs. Spent over time</p></div></div>
+                    <div class="chart-wrap"><canvas id="chart-token-history"></canvas></div>
                 </div>
             </div>
-
             <div class="card">
-                <div class="chart-header">
-                    <h3>Transaction Log</h3>
-                </div>
+                <div class="chart-header"><div><h3>Transaction Log</h3></div></div>
                 <div id="token-log" class="data-table-container"></div>
             </div>
         </section>
 
-        <!-- ═══ Settings Page ═══ -->
+        <!-- ═══ Settings ═══ -->
         <section id="page-settings" class="page">
             <div class="page-header">
-                <h1>Settings</h1>
-                <p class="page-subtitle">All changes require Admin Password</p>
+                <div><h1>Settings</h1><p class="page-subtitle-inline">All changes require Admin Password</p></div>
             </div>
-
             <div class="settings-grid">
-                <!-- Focus Mode -->
-                <div class="settings-card">
+                <div class="settings-card focus-settings-card">
                     <div class="settings-card-header">
-                        <span class="settings-icon">🎯</span>
+                        <div class="settings-icon-wrap focus-icon">🎯</div>
                         <h3>Focus Mode</h3>
                     </div>
-                    <p class="settings-desc">Block distractions and stay focused. Blocks social media, entertainment, and non-study content.</p>
+                    <p class="settings-desc">Lock down distractions. Blocks social media, entertainment, and games.</p>
                     <div class="setting-row">
-                        <span>Status</span>
+                        <span class="setting-label">Status</span>
                         <div class="toggle-group" id="focus-mode-toggle">
                             <button class="toggle-btn active" data-value="off">OFF</button>
                             <button class="toggle-btn" data-value="on">ON</button>
                         </div>
                     </div>
                     <div class="setting-row">
-                        <span>Auto-trigger threshold</span>
+                        <span class="setting-label">Auto-trigger</span>
                         <div class="setting-input-group">
                             <input type="number" id="auto-focus-threshold" value="30" min="10" max="120" class="setting-input">
                             <span class="input-suffix">min gaming</span>
                         </div>
                     </div>
                 </div>
-
-                <!-- DNS Blocking -->
                 <div class="settings-card">
                     <div class="settings-card-header">
-                        <span class="settings-icon">🛡️</span>
+                        <div class="settings-icon-wrap shield-icon">🛡️</div>
                         <h3>Adult Content Block</h3>
                     </div>
                     <p class="settings-desc">Uses Cloudflare Family DNS (1.1.1.3) to block adult content system-wide.</p>
                     <div class="setting-row">
-                        <span>DNS Blocking</span>
+                        <span class="setting-label">DNS Blocking</span>
                         <div class="toggle-group" id="dns-toggle">
                             <button class="toggle-btn" data-value="off">OFF</button>
                             <button class="toggle-btn active" data-value="on">ON</button>
                         </div>
                     </div>
                 </div>
-
-                <!-- Blocked Apps -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <div class="settings-icon-wrap token-icon">🪙</div>
+                        <h3>Token Rates</h3>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Earn (per hour study)</span>
+                        <input type="number" id="token-earn-rate" value="30" min="1" max="100" class="setting-input">
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Deduct (per hour gaming)</span>
+                        <input type="number" id="token-deduct-rate" value="15" min="1" max="100" class="setting-input">
+                    </div>
+                    <button class="btn btn-secondary mt-1" id="btn-save-token-rates">Save Rates</button>
+                </div>
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <div class="settings-icon-wrap security-icon">🔐</div>
+                        <h3>Security</h3>
+                    </div>
+                    <p class="settings-desc">Manage admin password and engine access.</p>
+                    <div class="btn-stack">
+                        <button class="btn btn-secondary" id="btn-change-password">🔑 Change Password</button>
+                        <button class="btn btn-danger" id="btn-disable-engine">⚡ Disable Engine</button>
+                    </div>
+                </div>
                 <div class="settings-card wide">
                     <div class="settings-card-header">
-                        <span class="settings-icon">🚫</span>
+                        <div class="settings-icon-wrap block-icon">🚫</div>
                         <h3>Blocked Applications</h3>
                     </div>
                     <p class="settings-desc">Custom apps to block (one per line). Steam games are auto-detected.</p>
                     <textarea id="blocked-apps-list" class="settings-textarea" placeholder="e.g. game.exe&#10;another_app.exe"></textarea>
                     <button class="btn btn-secondary" id="btn-save-blocked-apps">Save Blocked Apps</button>
                 </div>
-
-                <!-- Whitelisted Apps -->
                 <div class="settings-card wide">
                     <div class="settings-card-header">
-                        <span class="settings-icon">✅</span>
+                        <div class="settings-icon-wrap allow-icon">✅</div>
                         <h3>Whitelisted Applications</h3>
                     </div>
                     <p class="settings-desc">Apps that should NEVER be blocked (e.g. Desktop Mate, VTube Studio).</p>
                     <textarea id="whitelisted-apps-list" class="settings-textarea" placeholder="e.g. DesktopMate.exe&#10;VTube Studio.exe"></textarea>
                     <button class="btn btn-secondary" id="btn-save-whitelisted-apps">Save Whitelist</button>
                 </div>
-
-                <!-- Whitelisted Websites (Study Domains) -->
                 <div class="settings-card wide">
                     <div class="settings-card-header">
-                        <span class="settings-icon">🌐</span>
+                        <div class="settings-icon-wrap web-icon">🌐</div>
                         <h3>Whitelisted Websites (Study)</h3>
                     </div>
-                    <p class="settings-desc">Domains that should always count as <strong>study time</strong> (one per line). These are allowed in Focus Mode and tracked as study.</p>
-                    <textarea id="whitelisted-websites" class="settings-textarea" placeholder="e.g. geeksforgeeks.org&#10;javatpoint.com&#10;brilliant.org&#10;freecodecamp.org"></textarea>
+                    <p class="settings-desc">Domains always counted as <strong>study time</strong> and allowed in Focus Mode.</p>
+                    <textarea id="whitelisted-websites" class="settings-textarea" placeholder="e.g. geeksforgeeks.org&#10;freecodecamp.org&#10;brilliant.org"></textarea>
                     <button class="btn btn-secondary" id="btn-save-whitelisted-websites">Save Websites</button>
                 </div>
-
-                <!-- Whitelisted YouTube Channels -->
                 <div class="settings-card wide">
                     <div class="settings-card-header">
-                        <span class="settings-icon">📺</span>
+                        <div class="settings-icon-wrap yt-icon">📺</div>
                         <h3>Whitelisted YouTube Channels</h3>
                     </div>
-                    <p class="settings-desc">YouTube channel names allowed even in Focus Mode (one per line). The channel name must appear in the video page title.</p>
+                    <p class="settings-desc">Channel names allowed in Focus Mode (one per line). Must appear in video title.</p>
                     <textarea id="whitelisted-channels" class="settings-textarea" placeholder="e.g. 3Blue1Brown&#10;Fireship&#10;CS Dojo"></textarea>
                     <button class="btn btn-secondary" id="btn-save-channels">Save Channels</button>
-
-                    <!-- YouTube Channel Search -->
                     <div class="yt-search-section">
                         <h4 class="subsection-title">🔍 Search & Add YouTube Channels</h4>
-                        <p class="settings-desc">Search for educational channels on YouTube. Click "Add" to whitelist them.</p>
                         <div class="yt-search-bar">
-                            <input type="text" id="yt-search-input" class="modal-input" placeholder="Search YouTube channels (e.g. 3Blue1Brown, Fireship)">
+                            <input type="text" id="yt-search-input" class="modal-input" placeholder="Search educational channels...">
                             <button class="btn btn-primary" id="btn-yt-search">Search</button>
                         </div>
-                        <div id="yt-search-results" class="yt-search-results">
-                            <p class="empty-text">Search for a channel name above</p>
-                        </div>
+                        <div id="yt-search-results" class="yt-search-results"><p class="empty-text">Search for a channel name above</p></div>
                         <div class="yt-embed-container" id="yt-embed-container" style="display:none;">
                             <iframe id="yt-embed-iframe" width="100%" height="315" frameborder="0" allowfullscreen></iframe>
                         </div>
                     </div>
                 </div>
-
-                <!-- Token Rates -->
-                <div class="settings-card">
-                    <div class="settings-card-header">
-                        <span class="settings-icon">🪙</span>
-                        <h3>Token Rates</h3>
-                    </div>
-                    <div class="setting-row">
-                        <span>Earn rate (per hour study)</span>
-                        <input type="number" id="token-earn-rate" value="30" min="1" max="100" class="setting-input">
-                    </div>
-                    <div class="setting-row">
-                        <span>Deduct rate (per hour gaming)</span>
-                        <input type="number" id="token-deduct-rate" value="15" min="1" max="100" class="setting-input">
-                    </div>
-                    <button class="btn btn-secondary" id="btn-save-token-rates">Save Rates</button>
-                </div>
-
-                <!-- Security -->
-                <div class="settings-card">
-                    <div class="settings-card-header">
-                        <span class="settings-icon">🔐</span>
-                        <h3>Security</h3>
-                    </div>
-                    <button class="btn btn-secondary" id="btn-change-password">Change Password</button>
-                    <div style="height: 1rem;"></div>
-                    <button class="btn btn-danger" id="btn-disable-engine">⚡ Disable Engine</button>
-                </div>
             </div>
         </section>
     </main>
 
-    <!-- ═══ Password Modal ═══ -->
+    <!-- Modal -->
     <div id="password-modal" class="modal-overlay hidden">
         <div class="modal">
+            <div class="modal-glow"></div>
             <div class="modal-header">
                 <h2 id="modal-title">🔐 Admin Password</h2>
                 <button class="modal-close" id="modal-close">&times;</button>
@@ -466,7 +451,7 @@
             <div class="modal-body">
                 <p id="modal-message">Enter your admin password to continue.</p>
                 <div class="input-group">
-                    <input type="password" id="modal-password" class="modal-input" placeholder="Password" autocomplete="off">
+                    <input type="password" id="modal-password" class="modal-input" placeholder="Enter password..." autocomplete="off">
                     <button class="eye-toggle" id="toggle-password-visibility">👁️</button>
                 </div>
                 <div id="modal-extra-fields"></div>
@@ -483,9 +468,7 @@
         </div>
     </div>
 
-    <!-- ═══ Toast Notifications ═══ -->
     <div id="toast-container" class="toast-container"></div>
-
     <script src="app.js"></script>
 </body>
 </html>
