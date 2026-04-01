@@ -18,7 +18,7 @@
 
 ---
 
-## 🤔 Why Focus Engine Pro Is Different
+## 🤔 Why Productive-OS Is Different
 
 Most focus apps are easy to beat. You close the browser extension, switch to a different browser, or just uninstall the app. Done — distraction wins.
 
@@ -195,7 +195,7 @@ If SATHI helped you study better, focus longer, or simply stopped you from openi
 
 ## ⚠️ Disclaimer
 
-Focus Engine Pro makes real, active changes to your Windows OS — including modifying `HKLM` Registry keys, changing DNS settings via `netsh`, and forcefully terminating processes. **Use at your own risk.** The developers are not responsible for system lockouts or data loss caused by manually tampering with the locked SQLite database while the engine is running. Always use the official admin password flow to stop or modify an active session.
+Productive-OS makes real, active changes to your Windows OS — including modifying `HKLM` Registry keys, changing DNS settings via `netsh`, and forcefully terminating processes. **Use at your own risk.** The developers are not responsible for system lockouts or data loss caused by manually tampering with the locked SQLite database while the engine is running. Always use the official admin password flow to stop or modify an active session.
 
 ---
 
